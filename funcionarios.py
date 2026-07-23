@@ -75,28 +75,21 @@ def salvar_dataframe_csv_funcionarios(df, nome_preferido=NOME_CSV):
     return None
 
 
-def montar_mapas_cargo_lotacao(id_empresa):
-    """Mapas idCargo/idLotacao → nome para uma empresa."""
+def montar_mapa_cargo(id_empresa):
+    """Mapa idCargo → nome para uma empresa."""
     cargos = consultar_contabit("cargo", id_empresa)
-    lotacoes = consultar_contabit("lotacao", id_empresa)
-    mapa_cargo = {
+    return {
         item.get("idCargo"): (item.get("dsCargo") or "").strip() for item in cargos
     }
-    mapa_lotacao = {
-        item.get("idLotacao"): (item.get("dsLotacao") or "").strip() for item in lotacoes
-    }
-    return mapa_cargo, mapa_lotacao
 
 
 def mapear_trabalhador_para_csv(
-    item, id_empresa, mapa_cargo, mapa_lotacao, campo_chave="cpf"
+    item, id_empresa, mapa_cargo, campo_chave="cpf"
 ):
     cpf = formatar_cpf_11_digitos(item.get("nrCPF", ""))
     matricula = str(item.get("nrMatricula") or "").strip()
     id_cargo = item.get("idCargo")
-    id_lotacao = item.get("idLotacao")
     nome_cargo = mapa_cargo.get(id_cargo, "")
-    nome_lotacao = mapa_lotacao.get(id_lotacao, "")
 
     telefone = item.get("nrTelefoneCelular") or item.get("nrTelefoneFixo") or ""
     endereco_partes = [
@@ -141,8 +134,8 @@ def mapear_trabalhador_para_csv(
         "nacionalidade": "",
         "naturalidade": "",
         "complemento": item.get("dsCpLogradouro") or "",
-        "codigo_unidade": str(id_lotacao) if id_lotacao is not None else "",
-        "nome_unidade": nome_lotacao,
+        "codigo_unidade": "",
+        "nome_unidade": "",
         "codigo_cargo": str(id_cargo) if id_cargo is not None else "",
         "nome_cargo": nome_cargo,
         "senha": "Ponto123",
@@ -154,13 +147,13 @@ def mapear_trabalhador_para_csv(
         "empresa": "",
         "nome_funcao": nome_cargo,
         "codigo_legado_funcao": str(id_cargo) if id_cargo is not None else "",
-        "nro_centro_custo": str(id_lotacao) if id_lotacao is not None else "",
-        "codigo_legado_centro_custo": str(id_lotacao) if id_lotacao is not None else "",
-        "nome_centro_custo": nome_lotacao,
+        "nro_centro_custo": "",
+        "codigo_legado_centro_custo": "",
+        "nome_centro_custo": "",
         "cod_sindicato": "",
         "nome_sindicato": "",
         "orgao_emissor_rg": "",
-        "timezone": "America/Manaus",
+        "timezone": "",
     }
 
 
@@ -182,16 +175,16 @@ def gerar_csv_funcionarios():
 
     for id_empresa, lista in por_empresa:
         if id_empresa not in mapas_cache:
-            print(f"Carregando mapas cargo/lotacao empresa {id_empresa}...")
-            mapas_cache[id_empresa] = montar_mapas_cargo_lotacao(id_empresa)
-        mapa_cargo, mapa_lotacao = mapas_cache[id_empresa]
+            print(f"Carregando mapa de cargos empresa {id_empresa}...")
+            mapas_cache[id_empresa] = montar_mapa_cargo(id_empresa)
+        mapa_cargo = mapas_cache[id_empresa]
 
         for item in lista:
             # Inclui ativos do mês; se já desligado, ainda pode vir na consulta —
             # mantém dtdemissao preenchida quando houver.
             funcionarios.append(
                 mapear_trabalhador_para_csv(
-                    item, id_empresa, mapa_cargo, mapa_lotacao, campo_chave
+                    item, id_empresa, mapa_cargo, campo_chave
                 )
             )
 
