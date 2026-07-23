@@ -134,8 +134,6 @@ def mapear_trabalhador_para_csv(
         "nacionalidade": "",
         "naturalidade": "",
         "complemento": item.get("dsCpLogradouro") or "",
-        "codigo_unidade": "",
-        "nome_unidade": "",
         "codigo_cargo": str(id_cargo) if id_cargo is not None else "",
         "nome_cargo": nome_cargo,
         "senha": "Ponto123",
@@ -147,13 +145,9 @@ def mapear_trabalhador_para_csv(
         "empresa": "",
         "nome_funcao": nome_cargo,
         "codigo_legado_funcao": str(id_cargo) if id_cargo is not None else "",
-        "nro_centro_custo": "",
-        "codigo_legado_centro_custo": "",
-        "nome_centro_custo": "",
         "cod_sindicato": "",
         "nome_sindicato": "",
         "orgao_emissor_rg": "",
-        "timezone": "",
     }
 
 
