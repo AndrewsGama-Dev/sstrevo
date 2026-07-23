@@ -1,213 +1,190 @@
-# Atualizar integração no servidor
+# Deploy e atualização no servidor (VPS Hostinger)
 
-Projeto em Python: **corprint** — copiar código, manter `.config` e dependências alinhadas ao `requirements.txt`.
+Integração **Contabit → Hevi/ifPonto** (projeto Python **sstrevo**).
 
-**Caminho no servidor:** `/home/gogotech/integracao/corprint`  
-**Repositório:** https://github.com/AndrewsGama-Dev/corprint.git
+| Item | Valor |
+|------|--------|
+| Caminho no servidor | `/home/gogotech/integracao/sstrevo` |
+| Repositório | https://github.com/AndrewsGama-Dev/sstrevo.git |
+| Fonte | API Contabit |
+| Destino | Hevi/ifPonto (`[APITARGET]` no `.config`) |
+| Orquestrador | `main.py` / `integrador.sh` |
 
 ## 1. Antes de atualizar
 
-- Fazer **backup** da pasta atual no servidor (principalmente `.config` e eventuais CSVs/relatórios importantes).
-- Anotar como a integração é **disparada** hoje (Agendador de Tarefas no Windows, **cron** no Linux, serviço manual, etc.).
+- Fazer **backup** do `.config` de produção (tokens e mapeamentos).
+- Confirmar como a integração dispara hoje (**cron** no Linux).
 
-## 2. O que enviar para o servidor
+## 2. O que vai no servidor
 
-**Incluir (código):**
+**Código (via Git):**
 
-- `main.py`, todos os `.py` dos módulos (`empresas`, `departamentos`, `cargos`, `funcionarios`, `afastamentos`, `demissoes`, `ferias`, etc.)
-- `config_reader.py`
-- `requirements.txt`
-- Scripts opcionais que usarem: `consulta_funcionarios_ativos.py`, `relatorio_funcionarios_demitidos.py`, `gerar_pdf_requisitos.py`, documentação (`REQUISITOS_*.md`/`.pdf`)
+- `main.py`, `integrador.sh`, `config_reader.py`, `contabit_client.py`
+- Módulos: `empresas.py`, `departamentos.py`, `cargos.py`, `funcionarios.py`, `afastamentos.py`, `demissoes.py`
+- `requirements.txt`, `.gitignore`, este `DEPLOY_SERVIDOR.md`
 
-**Não versionar em repositório público (tratar com cuidado):**
+**Não versionar (criar só no servidor):**
 
-- **`.config`** — contém token e senhas. No servidor, **não substituir** o `.config` de produção pelo de desenvolvimento, a menos que seja intencional. Após copiar o código novo, **reaplique** o `.config` de produção se tiver sido sobrescrito por engano.
+- **`.config`** — token Contabit, token Hevi, empresas, mapeamento de afastamentos
+- `.venv/`
+- CSVs gerados (`*_api.csv`), logs (`integrador.log`), histórico `demissoes_cpf_processados.txt`
 
-**Não obrigatório copiar:**
+## 3. Estrutura do `.config` (produção)
 
-- `__pycache__`, `*.pyc`, CSVs gerados (`*_api.csv`), `logs_demissao/`, relatórios antigos (opcional manter histórico).
+Criar em `/home/gogotech/integracao/sstrevo/.config`:
 
-## 3. Ambiente Python no servidor
+```ini
+[APISOURCE]
+url = https://dalloglio.contabit.com.br/api
+token = "SEU_TOKEN_CONTABIT"
 
-Na pasta da integração:
+[FILTROS]
+codigo_empresa = 233,384
+
+[MODULOS]
+empresas = false
+departamentos = true
+cargos = true
+funcionarios = true
+afastamentos = true
+demissoes = true
+
+[APITARGET]
+url = https://stou.ifractal.com.br/sstrevo/rest/
+integracao = gotech
+token_base = SEU_TOKEN_BASE_HEVI
+campo_chave = cpf
+pag_demissao = funcionario_demissao
+
+[AFASTAMENTOS]
+# Contabit flMotivoAfastamento = ID Hevi
+95 = 95
+52 = 52
+54 = 54
+58 = 58
+70 = 70
+```
+
+Auth Contabit: header `Authorization: <token>` (sem `Bearer`).  
+`mesAno` em trabalhador/desligamento/afastamento: **sempre o mês atual**.
+
+## 4. Primeira instalação no VPS
 
 ```bash
-cd /home/gogotech/integracao/corprint
+mkdir -p /home/gogotech/integracao/sstrevo
+cd /home/gogotech/integracao/sstrevo
+
+# Clone direto na pasta (evita sstrevo/sstrevo)
+git clone https://github.com/AndrewsGama-Dev/sstrevo.git .
+
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install -r requirements.txt
-```
 
-No **Windows Server**, equivalente:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -U pip
-pip install -r requirements.txt
-```
-
-**Nota Linux:** algumas entradas do `requirements.txt` são típicas de Windows (`pyinstaller`, `pywin32-ctypes`). Se `pip install -r requirements.txt` falhar, instale apenas o necessário à execução:
-
-```bash
+# No Linux, o requirements.txt pode falhar por pacotes Windows.
+# Instale o mínimo necessário:
 pip install requests pandas pytz
+
+chmod +x integrador.sh
+
+# Criar o .config (não vem do Git)
+nano .config
 ```
 
-(+ `pip install markdown xhtml2pdf` só se forem usar `gerar_pdf_requisitos.py`.)
-
-Confirme se `configparser` está disponível (vem na biblioteca padrão do Python 3).
-
-## 4. Teste rápido após deploy
-
-Na pasta onde está o `.config`:
+Se a pasta já tiver `.venv` e o `git clone .` falhar (“not an empty directory”):
 
 ```bash
-# Só funcionários CSV (sem envio ao destino), se já usarem esse fluxo:
-python3 funcionarios.py csv
-
-# Integração completa (cuidado: envia dados ao destino / SOAP onde aplicável):
-python3 main.py
-```
-
-Ajustar o comando ao interpretador correto (`python` vs `python3` vs `.venv/bin/python`).
-
-## 5. Agendamento
-
-- **Windows:** Agendador de Tarefas — apontar “Programa” para o `python.exe` do venv e “Argumentos” para o caminho completo de `main.py`; “Iniciar em” = pasta do projeto (onde está o `.config`).
-- **Linux:** `crontab -e`:
-
-```cron
-# Exemplo: todo dia às 02:15
-15 2 * * * cd /home/gogotech/integracao/corprint && . .venv/bin/activate && python main.py >> logs/cron.log 2>&1
-```
-
-## 6. Transporte dos arquivos
-
-Formas usuais: **Git** (pull no VPS), **rsync** ou **scp** por SSH, **SFTP** (WinSCP/FileZilla).  
-
-**Nunca** publique o `.config` em repositório **público**. Use repositório **privado** ou envie o `.config` só por canal seguro (scp separado, secret do painel, etc.).
-
----
-
-## 6.1 VPS Linux — subir ou atualizar o código (SSH)
-
-Caminho fixo desta integração: `/home/gogotech/integracao/corprint`
-
-### Primeira vez no VPS (preparar pasta e venv)
-
-Conecte: `ssh gogotech@IP_DO_VPS`
-
-```bash
-mkdir -p /home/gogotech/integracao/corprint
-cd /home/gogotech/integracao/corprint
-git clone https://github.com/AndrewsGama-Dev/corprint.git .
-python3 -m venv .venv
+cd /home/gogotech/integracao/sstrevo
+mv .venv /tmp/sstrevo_venv_backup
+git clone https://github.com/AndrewsGama-Dev/sstrevo.git .
+mv /tmp/sstrevo_venv_backup .venv
 source .venv/bin/activate
-pip install -U pip
-# Se requirements.txt falhar no Linux (pacotes Windows), use:
 pip install requests pandas pytz
+chmod +x integrador.sh
 ```
 
-Crie o **`.config`** direto no VPS (nano/vi) ou copie **uma vez** do seu PC (incluir `[FILTROS] codigo_empresa = 129`):
+## 5. Atualizar código (Git — recomendado)
 
-```bash
-# No seu computador (exemplo scp do Windows PowerShell ou Linux):
-scp .config gogotech@IP_DO_VPS:/home/gogotech/integracao/corprint/.config
-```
-
-### Opção A — Atualizar com **Git** (recomendado)
-
-**No PC:** commit + push para branch (ex.: `main`), **sem** commitar `.config` (`git status` deve mostrar `.config` ignorado ou fora do repo).
+**No PC:** commit + push em `main` (**sem** `.config`).
 
 **No VPS:**
 
 ```bash
-cd /home/gogotech/integracao/corprint
+cd /home/gogotech/integracao/sstrevo
 git pull origin main
 source .venv/bin/activate
-pip install -r requirements.txt || pip install -U requests pandas pytz
-python3 funcionarios.py csv   # teste opcional
+pip install requests pandas pytz   # se houver dependência nova
 ```
 
-### Opção B — **rsync** (do seu PC para o VPS)
+O `.config` de produção **não** é sobrescrito pelo `git pull`.
 
-Exclui `.config` no envio para **não sobrescrever** produção (o `.config` continua só no servidor).
-
-**Linux / macOS / WSL:**
+## 6. Testes
 
 ```bash
-cd /caminho/para/pasta/pai
-rsync -avz --delete \
-  --exclude '.config' \
-  --exclude '.venv' \
-  --exclude '__pycache__' \
-  --exclude '*.pyc' \
-  --exclude 'logs_demissao' \
-  --exclude '*.csv' \
-  ./corprint/ gogotech@IP_DO_VPS:/home/gogotech/integracao/corprint/
-```
-
-**Depois no VPS:** `ssh` + `source .venv/bin/activate` + `pip install ...` como acima.
-
-### Opção C — **scp** ou **ZIP** (Windows PowerShell)
-
-Compacte a pasta **sem** incluir `.config` de desenvolvimento se for substituir tudo, ou envie só os `.py` + `requirements.txt`.
-
-```powershell
-# Exemplo: enviar pasta inteira (atenção: pode sobrescrever .config — faça backup no VPS antes)
-scp -r C:\caminho\corprint\* gogotech@IP_DO_VPS:/home/gogotech/integracao/corprint/
-```
-
-### Checklist pós-deploy no VPS
-
-```bash
-cd /home/gogotech/integracao/corprint
-test -f .config && echo "OK .config existe" || echo "FALTA .config"
+cd /home/gogotech/integracao/sstrevo
 source .venv/bin/activate
-python3 funcionarios.py csv
-# ou: python3 main.py   (integração completa — cuidado em produção)
+
+# Só CSV (sem enviar ao Hevi)
+python funcionarios.py csv
+python afastamentos.py csv
+python demissoes.py csv
+
+# Integração completa (envia ao Hevi)
+./integrador.sh
+# ou: python main.py
 ```
 
-### Agendamento no VPS (cron) — `integrador.sh`
-
-Preferir **`integrador.sh`** (executa `python main.py` com código do Git).
+## 7. Cron (Linux)
 
 ```bash
-cd /home/gogotech/integracao/corprint
+cd /home/gogotech/integracao/sstrevo
 chmod +x integrador.sh
 crontab -e
 ```
 
-Exemplo de linha no cron:
+Exemplo — a cada 30 minutos (mesmo padrão das outras integrações):
 
 ```cron
-*/30 * * * * cd /home/gogotech/integracao/corprint && flock -n /tmp/integrador_corprint.lock ./integrador.sh >> /home/gogotech/integracao/corprint/integrador.log 2>&1
+*/30 * * * * cd /home/gogotech/integracao/sstrevo && flock -n /tmp/integrador_sstrevo.lock ./integrador.sh >> /home/gogotech/integracao/sstrevo/integrador.log 2>&1
 ```
 
-Rotação de log (se existir `rotaciona_log.sh`):
-
-```cron
-0 3 * * * /home/gogotech/integracao/corprint/rotaciona_log.sh
-```
-
-Teste manual antes do cron:
+Conferir:
 
 ```bash
-cd /home/gogotech/integracao/corprint
+crontab -l
+tail -f /home/gogotech/integracao/sstrevo/integrador.log
+```
+
+## 8. Checklist pós-deploy
+
+```bash
+cd /home/gogotech/integracao/sstrevo
+test -f .config && echo "OK .config" || echo "FALTA .config"
+test -x integrador.sh && echo "OK integrador.sh" || chmod +x integrador.sh
+source .venv/bin/activate
+python -c "import requests, pandas, pytz; print('OK deps')"
 ./integrador.sh
 ```
 
-### Firewall
+## 9. Rede / firewall
 
-Garantir saída **HTTPS (443)** para APIs Alterdata/destino e URL do SOAP. Nada a abrir na entrada se o script só inicia conexões de saída.
+Saída **HTTPS (443)** para:
+
+- Contabit (`dalloglio.contabit.com.br`)
+- Hevi (`stou.ifractal.com.br`)
+
+Não é necessário abrir porta de entrada se o script só faz conexões de saída.
+
+## 10. Rollback
+
+Restaurar o backup da pasta (principalmente `.config`) e, se preciso:
+
+```bash
+cd /home/gogotech/integracao/sstrevo
+git log --oneline -5
+git checkout <commit_anterior> -- .
+```
 
 ---
 
-## 7. Rollback
-
-Se algo falhar, restaurar a pasta inteira do **backup** do passo 1 e só então revisar erro (versão Python, permissões, token expirado no `.config`, etc.).
-
----
-
-*Integração corprint — caminho padrão: `/home/gogotech/integracao/corprint`*
+*Integração sstrevo — Contabit → Hevi — caminho: `/home/gogotech/integracao/sstrevo`*
