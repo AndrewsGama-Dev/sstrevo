@@ -1,5 +1,6 @@
 #!/bin/bash
-# Integração completa eContador -> Hevi (empresas, departamentos, cargos, funcionários, afastamentos, demissões)
+# Integração completa Contabit -> Hevi
+# (empresas, departamentos, cargos, funcionários, afastamentos, demissões)
 # Uso: ./integrador.sh   ou via cron com flock (ver DEPLOY_SERVIDOR.md)
 
 set -u

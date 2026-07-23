@@ -8,13 +8,17 @@ __pycache__/
 venv/
 env/
 
-# Saídas locais (opcional: remova a linha se quiser versionar exemplos)
+# Saídas locais / artefatos de execução
 *_api.csv
 *Copia*
 *copy*
 *.xlsx
+*.log
 logs_demissao/
 relatorio_*.json
 relatorio_*.csv
 relatorio_integracao_*.json
 erros_*.json
+*_dados_detalhados.json
+demissoes_cpf_processados.txt
+demissoes_matricula_processados.txt
