@@ -15,7 +15,6 @@ from config_reader import (
 
 from contabit_client import (
     consultar_todas_empresas,
-    consultar_contabit,
     formatar_cpf_11_digitos,
     formatar_data_brasileira,
 )
@@ -75,21 +74,9 @@ def salvar_dataframe_csv_funcionarios(df, nome_preferido=NOME_CSV):
     return None
 
 
-def montar_mapa_cargo(id_empresa):
-    """Mapa idCargo → nome para uma empresa."""
-    cargos = consultar_contabit("cargo", id_empresa)
-    return {
-        item.get("idCargo"): (item.get("dsCargo") or "").strip() for item in cargos
-    }
-
-
-def mapear_trabalhador_para_csv(
-    item, id_empresa, mapa_cargo, campo_chave="cpf"
-):
+def mapear_trabalhador_para_csv(item, id_empresa, campo_chave="cpf"):
     cpf = formatar_cpf_11_digitos(item.get("nrCPF", ""))
     matricula = str(item.get("nrMatricula") or "").strip()
-    id_cargo = item.get("idCargo")
-    nome_cargo = mapa_cargo.get(id_cargo, "")
 
     telefone = item.get("nrTelefoneCelular") or item.get("nrTelefoneFixo") or ""
     endereco_partes = [
@@ -134,8 +121,6 @@ def mapear_trabalhador_para_csv(
         "nacionalidade": "",
         "naturalidade": "",
         "complemento": item.get("dsCpLogradouro") or "",
-        "codigo_cargo": str(id_cargo) if id_cargo is not None else "",
-        "nome_cargo": nome_cargo,
         "senha": "Ponto123",
         "cracha": cpf,
         "nome_nivel": "",
@@ -143,8 +128,6 @@ def mapear_trabalhador_para_csv(
         "codigo_escala": "",
         "dtinicio_escala": "",
         "empresa": "",
-        "nome_funcao": nome_cargo,
-        "codigo_legado_funcao": str(id_cargo) if id_cargo is not None else "",
         "cod_sindicato": "",
         "nome_sindicato": "",
         "orgao_emissor_rg": "",
@@ -165,21 +148,13 @@ def gerar_csv_funcionarios():
 
     por_empresa = consultar_todas_empresas("trabalhador", com_mes_ano=True)
     funcionarios = []
-    mapas_cache = {}
 
     for id_empresa, lista in por_empresa:
-        if id_empresa not in mapas_cache:
-            print(f"Carregando mapa de cargos empresa {id_empresa}...")
-            mapas_cache[id_empresa] = montar_mapa_cargo(id_empresa)
-        mapa_cargo = mapas_cache[id_empresa]
-
         for item in lista:
             # Inclui ativos do mês; se já desligado, ainda pode vir na consulta —
             # mantém dtdemissao preenchida quando houver.
             funcionarios.append(
-                mapear_trabalhador_para_csv(
-                    item, id_empresa, mapa_cargo, campo_chave
-                )
+                mapear_trabalhador_para_csv(item, id_empresa, campo_chave)
             )
 
     if not funcionarios:
