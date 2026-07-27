@@ -140,3 +140,15 @@ def formatar_cpf_mascarado(cpf):
 def normalizar_nome(nome):
     """Normaliza nome para deduplicação (casefold + trim)."""
     return (nome or "").strip().casefold()
+
+
+def codigo_cargo_unico(id_empresa, id_cargo):
+    """
+    Gera codigo_legado único concatenando empresa + idCargo Contabit.
+
+    Ex.: empresa 233, cargo 8  → "2338"
+         empresa 384, cargo 8  → "3848"
+    """
+    if id_empresa is None or id_cargo is None or str(id_cargo).strip() == "":
+        return ""
+    return f"{str(id_empresa).strip()}{str(id_cargo).strip()}"

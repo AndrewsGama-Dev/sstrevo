@@ -15,8 +15,10 @@ from config_reader import (
 
 from contabit_client import (
     consultar_todas_empresas,
+    consultar_contabit,
     formatar_cpf_11_digitos,
     formatar_data_brasileira,
+    codigo_cargo_unico,
 )
 
 # Reexport para módulos que importavam destes helpers
@@ -74,9 +76,20 @@ def salvar_dataframe_csv_funcionarios(df, nome_preferido=NOME_CSV):
     return None
 
 
-def mapear_trabalhador_para_csv(item, id_empresa, campo_chave="cpf"):
+def montar_mapa_cargo(id_empresa):
+    """Mapa idCargo Contabit → nome para uma empresa."""
+    cargos = consultar_contabit("cargo", id_empresa)
+    return {
+        item.get("idCargo"): (item.get("dsCargo") or "").strip() for item in cargos
+    }
+
+
+def mapear_trabalhador_para_csv(item, id_empresa, mapa_cargo, campo_chave="cpf"):
     cpf = formatar_cpf_11_digitos(item.get("nrCPF", ""))
     matricula = str(item.get("nrMatricula") or "").strip()
+    id_cargo = item.get("idCargo")
+    nome_cargo = mapa_cargo.get(id_cargo, "")
+    codigo_cargo = codigo_cargo_unico(id_empresa, id_cargo)
 
     telefone = item.get("nrTelefoneCelular") or item.get("nrTelefoneFixo") or ""
     endereco_partes = [
@@ -121,6 +134,8 @@ def mapear_trabalhador_para_csv(item, id_empresa, campo_chave="cpf"):
         "nacionalidade": "",
         "naturalidade": "",
         "complemento": item.get("dsCpLogradouro") or "",
+        "codigo_cargo": codigo_cargo,
+        "nome_cargo": nome_cargo,
         "senha": "Ponto123",
         "cracha": cpf,
         "nome_nivel": "",
@@ -128,6 +143,8 @@ def mapear_trabalhador_para_csv(item, id_empresa, campo_chave="cpf"):
         "codigo_escala": "",
         "dtinicio_escala": "",
         "empresa": "",
+        "nome_funcao": nome_cargo,
+        "codigo_legado_funcao": codigo_cargo,
         "cod_sindicato": "",
         "nome_sindicato": "",
         "orgao_emissor_rg": "",
@@ -148,13 +165,21 @@ def gerar_csv_funcionarios():
 
     por_empresa = consultar_todas_empresas("trabalhador", com_mes_ano=True)
     funcionarios = []
+    mapas_cache = {}
 
     for id_empresa, lista in por_empresa:
+        if id_empresa not in mapas_cache:
+            print(f"Carregando mapa de cargos empresa {id_empresa}...")
+            mapas_cache[id_empresa] = montar_mapa_cargo(id_empresa)
+        mapa_cargo = mapas_cache[id_empresa]
+
         for item in lista:
             # Inclui ativos do mês; se já desligado, ainda pode vir na consulta —
             # mantém dtdemissao preenchida quando houver.
             funcionarios.append(
-                mapear_trabalhador_para_csv(item, id_empresa, campo_chave)
+                mapear_trabalhador_para_csv(
+                    item, id_empresa, mapa_cargo, campo_chave
+                )
             )
 
     if not funcionarios:
@@ -167,7 +192,11 @@ def gerar_csv_funcionarios():
         return None
 
     print(f"Total funcionarios: {len(df)}")
-    print(df.head(3).to_string())
+    print(
+        df[["nome", "cpf", "codigo_cargo", "nome_cargo", "cod_empresa"]]
+        .head(5)
+        .to_string()
+    )
     return arquivo
 
 
