@@ -136,7 +136,6 @@ def mapear_trabalhador_para_csv(item, id_empresa, mapa_cargo, campo_chave="cpf")
         "complemento": item.get("dsCpLogradouro") or "",
         "codigo_cargo": codigo_cargo,
         "nome_cargo": nome_cargo,
-        "senha": "Ponto123",
         "cracha": cpf,
         "nome_nivel": "",
         "cod_escala_padrao": "",
