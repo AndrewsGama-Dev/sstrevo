@@ -195,6 +195,7 @@ def gerar_relatorio_final(resultados):
         "demissoes_api.csv",
     ):
         if os.path.exists(arquivo):
+            # demissoes_api.csv antigo pode existir mesmo com modulo pulado
             print(f"  OK  {arquivo} ({os.path.getsize(arquivo):,} bytes)")
         else:
             print(f"  --  {arquivo}")

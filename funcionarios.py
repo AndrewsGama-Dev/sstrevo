@@ -120,7 +120,8 @@ def mapear_trabalhador_para_csv(item, id_empresa, mapa_cargo, campo_chave="cpf")
         "login": cpf,
         "cod_empresa": str(id_empresa),
         "codigo_legado_empresa": str(id_empresa),
-        "dtdemissao": formatar_data_brasileira(item.get("dtDesligamento")),
+        # Demissão NÃO vai por este CSV — só pelo módulo demissoes (REST).
+        "dtdemissao": "",
         "regime_juridico": "",
         "tipo_salario": "",
         "salario": "",
@@ -173,8 +174,8 @@ def gerar_csv_funcionarios():
         mapa_cargo = mapas_cache[id_empresa]
 
         for item in lista:
-            # Inclui ativos do mês; se já desligado, ainda pode vir na consulta —
-            # mantém dtdemissao preenchida quando houver.
+            # Trabalhadores com dtDesligamento na Contabit ainda entram no cadastro,
+            # mas dtdemissao no CSV fica vazio — demissão é só via módulo demissoes.
             funcionarios.append(
                 mapear_trabalhador_para_csv(
                     item, id_empresa, mapa_cargo, campo_chave
