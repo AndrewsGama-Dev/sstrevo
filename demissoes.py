@@ -17,6 +17,7 @@ from config_reader import (
     ler_token_config,
     ler_config,
     gerar_token_target,
+    modulo_habilitado,
 )
 from contabit_client import (
     consultar_todas_empresas,
@@ -206,6 +207,10 @@ def gerar_csv_demissoes():
     print("GERACAO CSV DEMISSOES - Contabit /desligamento (REST)")
     print("=" * 70)
 
+    if not modulo_habilitado("demissoes"):
+        print("Modulo demissoes desabilitado em [MODULOS] — CSV nao gerado")
+        return None
+
     if not ler_token_config():
         print("Falha ao carregar token Contabit do .config")
         return None
@@ -259,6 +264,10 @@ def processar_integracao_completa():
     print("INTEGRACAO DEMISSOES - Contabit -> Hevi (REST)")
     print("=" * 70)
 
+    if not modulo_habilitado("demissoes"):
+        print("Modulo demissoes desabilitado em [MODULOS] (.config) — pulando")
+        return True
+
     arquivo = gerar_csv_demissoes()
     if not arquivo:
         return False
@@ -282,6 +291,10 @@ def processar_integracao_completa():
 
 if __name__ == "__main__":
     import sys
+
+    if not modulo_habilitado("demissoes"):
+        print("Modulo demissoes desabilitado em [MODULOS] (.config) — encerrando")
+        raise SystemExit(0)
 
     if len(sys.argv) > 1 and sys.argv[1].lower() == "csv":
         ok = bool(gerar_csv_demissoes())
