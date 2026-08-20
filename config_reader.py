@@ -6,18 +6,26 @@ from datetime import datetime
 
 import pytz
 
+# Sempre a pasta do projeto (onde está este arquivo), não o cwd do processo.
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(_BASE_DIR, ".config")
+
 
 def ler_config():
     """
     Lê o arquivo .config e retorna um dicionário com todas as seções.
     """
     try:
-        if not os.path.exists(".config"):
-            print("Arquivo .config nao encontrado")
+        if not os.path.exists(CONFIG_PATH):
+            print(f"Arquivo .config nao encontrado em: {CONFIG_PATH}")
             return None
 
         config = configparser.ConfigParser()
-        config.read(".config", encoding="utf-8")
+        # inline_comment_prefixes evita lixo após o valor (ex.: false # ...)
+        lidos = config.read(CONFIG_PATH, encoding="utf-8")
+        if not lidos:
+            print(f"Falha ao ler .config em: {CONFIG_PATH}")
+            return None
 
         config_dict = {}
         for secao in config.sections():
@@ -253,7 +261,19 @@ def _parse_bool_config(valor, default=True):
     """Interpreta true/false, 1/0, sim/nao, yes/no (case insensitive)."""
     if valor is None:
         return default
-    texto = str(valor).strip().strip('"').lower()
+    texto = (
+        str(valor)
+        .replace("\ufeff", "")
+        .replace("\xa0", " ")
+        .strip()
+        .strip('"')
+        .strip("'")
+        .lower()
+    )
+    # Remove comentario inline residual, se houver
+    for sep in ("#", ";"):
+        if sep in texto:
+            texto = texto.split(sep, 1)[0].strip()
     if texto in ("true", "1", "yes", "y", "sim", "s", "on"):
         return True
     if texto in ("false", "0", "no", "n", "nao", "não", "off"):
@@ -281,12 +301,17 @@ def ler_modulos_habilitados():
     try:
         config = ler_config()
         if not config or "MODULOS" not in config:
+            print(
+                f"AVISO: secao [MODULOS] nao encontrada em {CONFIG_PATH} "
+                f"— todos os modulos ficam ON"
+            )
             return habilitados
 
         secao = config["MODULOS"]
         for nome in MODULOS_PADRAO:
             if nome in secao:
-                habilitados[nome] = _parse_bool_config(secao.get(nome), default=True)
+                bruto = secao.get(nome)
+                habilitados[nome] = _parse_bool_config(bruto, default=True)
         return habilitados
     except Exception as e:
         print(f"Erro ao ler [MODULOS] do .config: {e}")

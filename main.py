@@ -26,7 +26,12 @@ try:
     import funcionarios
     import afastamentos
     import demissoes
-    from config_reader import ler_config, ler_token_config, ler_modulos_habilitados
+    from config_reader import (
+        ler_config,
+        ler_token_config,
+        ler_modulos_habilitados,
+        CONFIG_PATH,
+    )
 except ImportError as e:
     print(f"ERRO: Nao foi possivel importar um dos modulos necessarios: {e}")
     sys.exit(1)
@@ -54,10 +59,10 @@ def verificar_prerequisitos():
     print("Verificando pre-requisitos...")
     erros = []
 
-    if not os.path.exists(".config"):
-        erros.append("Arquivo .config nao encontrado")
+    if not os.path.exists(CONFIG_PATH):
+        erros.append(f"Arquivo .config nao encontrado em {CONFIG_PATH}")
     else:
-        print("Arquivo .config encontrado")
+        print(f"Arquivo .config encontrado: {CONFIG_PATH}")
         config = ler_config()
         if not config:
             erros.append("Erro ao ler arquivo .config")
