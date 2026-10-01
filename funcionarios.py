@@ -120,8 +120,6 @@ def mapear_trabalhador_para_csv(item, id_empresa, mapa_cargo, campo_chave="cpf")
         "login": cpf,
         "cod_empresa": str(id_empresa),
         "codigo_legado_empresa": str(id_empresa),
-        # Demissão NÃO vai por este CSV — só pelo módulo demissoes (REST).
-        "dtdemissao": "",
         "regime_juridico": "",
         "tipo_salario": "",
         "salario": "",
@@ -166,6 +164,7 @@ def gerar_csv_funcionarios():
     por_empresa = consultar_todas_empresas("trabalhador", com_mes_ano=True)
     funcionarios = []
     mapas_cache = {}
+    ignorados_desligados = 0
 
     for id_empresa, lista in por_empresa:
         if id_empresa not in mapas_cache:
@@ -174,13 +173,22 @@ def gerar_csv_funcionarios():
         mapa_cargo = mapas_cache[id_empresa]
 
         for item in lista:
-            # Trabalhadores com dtDesligamento na Contabit ainda entram no cadastro,
-            # mas dtdemissao no CSV fica vazio — demissão é só via módulo demissoes.
+            # Quem ja tem desligamento na Contabit nao entra neste CSV.
+            # Evita demissao indireta no Hevi; demissao so via modulo demissoes.
+            if item.get("dtDesligamento"):
+                ignorados_desligados += 1
+                continue
             funcionarios.append(
                 mapear_trabalhador_para_csv(
                     item, id_empresa, mapa_cargo, campo_chave
                 )
             )
+
+    if ignorados_desligados:
+        print(
+            f"Ignorados com dtDesligamento (nao enviados em funcionarios): "
+            f"{ignorados_desligados}"
+        )
 
     if not funcionarios:
         print("Nenhum trabalhador encontrado")
